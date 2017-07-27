@@ -1,7 +1,7 @@
 // @flow
 
 const window = require('./window');
-const {getImageData} = require('../util/browser');
+const {getImageData} = require('./image');
 
 /**
  * The type of a resource.

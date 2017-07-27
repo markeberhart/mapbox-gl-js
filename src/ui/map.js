@@ -4,6 +4,7 @@ const util = require('../util/util');
 const browser = require('../util/browser');
 const window = require('../util/window');
 const {HTMLImageElement, ImageData} = require('../util/window');
+const {getImageData} = require('../util/image');
 const DOM = require('../util/dom');
 const ajax = require('../util/ajax');
 
@@ -1178,24 +1179,24 @@ class Map extends Camera {
      * @param options
      * @param options.pixelRatio The ratio of pixels in the image to physical pixels on the screen
      */
-    addImage(name: string, data: HTMLImageElement | ImageData,
+    addImage(id: string, data: HTMLImageElement | ImageData,
              {pixelRatio = 1, sdf = false}: {pixelRatio?: number, sdf?: boolean} = {}) {
         if (data instanceof HTMLImageElement) {
-            data = browser.getImageData(data);
+            data = getImageData(data);
         }
         if (!(data instanceof ImageData)) {
             return this.fire('error', {error: new Error('Image provided in an invalid format. Supported formats are HTMLImageElement and ImageData.')});
         }
-        this.style.spriteAtlas.addImage(name, data, {pixelRatio, sdf});
+        this.style.addImage(id, { data, pixelRatio, sdf });
     }
 
     /**
      * Remove an image from the style (such as one used by `icon-image` or `background-pattern`).
      *
-     * @param {string} name The name of the image.
+     * @param id The ID of the image.
      */
-    removeImage(name: string) {
-        this.style.spriteAtlas.removeImage(name);
+    removeImage(id: string) {
+        this.style.removeImage(id);
     }
 
     /**

@@ -33,8 +33,8 @@ import type {Program} from '../data/program_configuration';
 import type Style from '../style/style';
 import type StyleLayer from '../style/style_layer';
 import type LineAtlas from './line_atlas';
-import type SpriteAtlas from '../symbol/sprite_atlas';
-import type GlyphSource from '../symbol/glyph_source';
+import type ImageManager from './image_manager';
+import type GlyphManager from './glyph_manager';
 
 type PainterOptions = {
     showOverdrawInspector: boolean,
@@ -77,8 +77,8 @@ class Painter {
     style: Style;
     options: PainterOptions;
     lineAtlas: LineAtlas;
-    spriteAtlas: SpriteAtlas;
-    glyphSource: GlyphSource;
+    imageManager: ImageManager;
+    glyphManager: GlyphManager;
     depthRange: number;
     isOpaquePass: boolean;
     currentLayer: number;
@@ -253,11 +253,8 @@ class Painter {
         this.options = options;
 
         this.lineAtlas = style.lineAtlas;
-
-        this.spriteAtlas = style.spriteAtlas;
-        this.spriteAtlas.setSprite(style.sprite);
-
-        this.glyphSource = style.glyphSource;
+        this.imageManager = style.imageManager;
+        this.glyphManager = style.glyphManager;
 
         this.frameHistory.record(Date.now(), this.transform.zoom, style.getTransition().duration);
 

@@ -32,6 +32,10 @@ import type {StructArray} from '../../util/struct_array';
 import type StyleLayer from '../../style/style_layer';
 import type {Shaping, PositionedIcon} from '../../symbol/shaping';
 import type {SymbolQuad} from '../../symbol/quads';
+import type {StyleImage} from '../../style/style_image';
+import type {StyleGlyph} from '../../style/style_glyph';
+import type {ImagePosition} from '../../render/image_atlas';
+import type {GlyphPosition} from '../../render/glyph_atlas';
 
 type SymbolBucketParameters = BucketParameters & {
     sdfIcons: boolean,
@@ -245,7 +249,6 @@ class SymbolBucket {
     index: number;
     sdfIcons: boolean;
     iconsNeedLinear: boolean;
-    fontstack: string;
     symbolInterfaces: typeof symbolInterfaces;
     buffers: {[string]: BufferGroup};
     textSizeData: any;
@@ -257,6 +260,7 @@ class SymbolBucket {
     features: Array<SymbolFeature>;
     arrays: {glyph: ArrayGroup, icon: ArrayGroup, collisionBox: ArrayGroup};
     symbolInstances: Array<SymbolInstance>;
+    pixelRatio: number;
     tilePixelRatio: number;
     compareText: {[string]: Array<Point>};
 
@@ -269,7 +273,7 @@ class SymbolBucket {
         this.index = options.index;
         this.sdfIcons = options.sdfIcons;
         this.iconsNeedLinear = options.iconsNeedLinear;
-        this.fontstack = options.fontstack;
+        this.pixelRatio = options.pixelRatio;
 
         // Set up 'program interfaces' dynamically based on the layer's style
         // properties (specifically its text-size properties).
@@ -404,7 +408,6 @@ class SymbolBucket {
             iconsNeedLinear: this.iconsNeedLinear,
             textSizeData: this.textSizeData,
             iconSizeData: this.iconSizeData,
-            fontstack: this.fontstack,
             placedGlyphArray: this.placedGlyphArray.serialize(transferables),
             placedIconArray: this.placedIconArray.serialize(transferables),
             glyphOffsetArray: this.glyphOffsetArray.serialize(transferables),
@@ -428,7 +431,10 @@ class SymbolBucket {
         });
     }
 
-    prepare(stacks: any, icons: any) {
+    prepare(glyphMap: {[string]: {[number]: ?StyleGlyph}},
+            glyphPositions: {[string]: {[number]: GlyphPosition}},
+            imageMap: {[string]: StyleImage},
+            imagePositions: {[string]: ImagePosition}) {
         this.symbolInstances = [];
 
         const tileSize = 512 * this.overscaling;
@@ -440,15 +446,17 @@ class SymbolBucket {
 
         const oneEm = 24;
         const lineHeight = layout['text-line-height'] * oneEm;
-        const fontstack = this.fontstack = layout['text-font'].join(',');
+
+        const fontstack = layout['text-font'].join(',');
         const textAlongLine = layout['text-rotation-alignment'] === 'map' && layout['symbol-placement'] === 'line';
+        const glyphs = glyphMap[fontstack] || {};
+        const glyphPositionMap = glyphPositions[fontstack] || {};
 
         for (const feature of this.features) {
 
-            let shapedTextOrientations;
+            const shapedTextOrientations = {};
             const text = feature.text;
             if (text) {
-                const allowsVerticalWritingMode = scriptDetection.allowsVerticalWritingMode(text);
                 const textOffset = this.layers[0].getLayoutValue('text-offset', {zoom: this.zoom}, feature.properties).map((t)=> t * oneEm);
                 const spacing = this.layers[0].getLayoutValue('text-letter-spacing', {zoom: this.zoom}, feature.properties) * oneEm;
                 const spacingIfAllowed = scriptDetection.allowsLetterSpacing(text) ? spacing : 0;
@@ -458,44 +466,32 @@ class SymbolBucket {
                     this.layers[0].getLayoutValue('text-max-width', {zoom: this.zoom}, feature.properties) * oneEm :
                     0;
 
-                shapedTextOrientations = {
-                    [WritingMode.horizontal]: shapeText(text,
-                        stacks[fontstack],
-                        maxWidth,
-                        lineHeight,
-                        textAnchor,
-                        textJustify,
-                        spacingIfAllowed,
-                        textOffset,
-                        oneEm,
-                        WritingMode.horizontal),
-                    [WritingMode.vertical]: allowsVerticalWritingMode && textAlongLine && shapeText(text,
-                        stacks[fontstack],
-                        maxWidth,
-                        lineHeight,
-                        textAnchor,
-                        textJustify,
-                        spacingIfAllowed,
-                        textOffset,
-                        oneEm,
-                        WritingMode.vertical)
+                const applyShaping = (text: string, writingMode: 1 | 2) => {
+                    return shapeText(
+                        text, maxWidth, lineHeight, textAnchor, textJustify,
+                        spacingIfAllowed, textOffset, oneEm, writingMode, glyphs);
                 };
-            } else {
-                shapedTextOrientations = {};
+
+                shapedTextOrientations[WritingMode.horizontal] = applyShaping(text, WritingMode.horizontal);
+
+                if (scriptDetection.allowsVerticalWritingMode(text) && textAlongLine) {
+                    shapedTextOrientations[WritingMode.vertical] = applyShaping(text, WritingMode.vertical);
+                }
             }
 
             let shapedIcon;
             if (feature.icon) {
-                const image = icons[feature.icon];
+                const image = imageMap[feature.icon];
                 if (image) {
-                    shapedIcon = shapeIcon(image,
+                    shapedIcon = shapeIcon(
+                        imagePositions[feature.icon],
                         this.layers[0].getLayoutValue('icon-offset', {zoom: this.zoom}, feature.properties));
                     if (this.sdfIcons === undefined) {
                         this.sdfIcons = image.sdf;
                     } else if (this.sdfIcons !== image.sdf) {
                         util.warnOnce('Style sheet warning: Cannot mix SDF and non-SDF icons in one buffer');
                     }
-                    if (!image.isNativePixelRatio) {
+                    if (image.pixelRatio !== this.pixelRatio) {
                         this.iconsNeedLinear = true;
                     } else if (layout['icon-rotate'] !== 0 || !this.layers[0].isLayoutValueFeatureConstant('icon-rotate')) {
                         this.iconsNeedLinear = true;
@@ -504,7 +500,7 @@ class SymbolBucket {
             }
 
             if (shapedTextOrientations[WritingMode.horizontal] || shapedIcon) {
-                this.addFeature(feature, shapedTextOrientations, shapedIcon);
+                this.addFeature(feature, shapedTextOrientations, shapedIcon, glyphPositionMap);
             }
         }
     }
@@ -517,7 +513,10 @@ class SymbolBucket {
      * source.)
      * @private
      */
-    addFeature(feature: SymbolFeature, shapedTextOrientations: ShapedTextOrientations, shapedIcon: PositionedIcon | void) {
+    addFeature(feature: SymbolFeature,
+               shapedTextOrientations: ShapedTextOrientations,
+               shapedIcon: PositionedIcon | void,
+               glyphPositionMap: {[number]: GlyphPosition}) {
         const layoutTextSize = this.layers[0].getLayoutValue('text-size', {zoom: this.zoom + 1}, feature.properties);
         const layoutIconSize = this.layers[0].getLayoutValue('icon-size', {zoom: this.zoom + 1}, feature.properties);
 
@@ -570,7 +569,7 @@ class SymbolBucket {
                 addToBuffers, this.collisionBoxArray, feature.index, feature.sourceLayerIndex, this.index,
                 textBoxScale, textPadding, textAlongLine, textOffset,
                 iconBoxScale, iconPadding, iconAlongLine, iconOffset,
-                {zoom: this.zoom}, feature.properties);
+                {zoom: this.zoom}, feature.properties, glyphPositionMap);
         };
 
         if (symbolPlacement === 'line') {
@@ -944,7 +943,8 @@ class SymbolBucket {
                       iconAlongLine: boolean,
                       iconOffset: [number, number],
                       globalProperties: Object,
-                      featureProperties: Object) {
+                      featureProperties: Object,
+                      glyphPositionMap: {[number]: GlyphPosition}) {
 
         let textCollisionFeature, iconCollisionFeature;
         let iconQuads = [];
@@ -954,7 +954,7 @@ class SymbolBucket {
             if (!shapedTextOrientations[writingMode]) continue;
             glyphQuads = glyphQuads.concat(addToBuffers ?
                 getGlyphQuads(anchor, shapedTextOrientations[writingMode],
-                    layer, textAlongLine, globalProperties, featureProperties) :
+                    layer, textAlongLine, globalProperties, featureProperties, glyphPositionMap) :
                 []);
             textCollisionFeature = new CollisionFeature(collisionBoxArray,
                 line,

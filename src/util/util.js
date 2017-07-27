@@ -89,8 +89,8 @@ exports.wrap = function (n: number, min: number, max: number): number {
  */
 exports.asyncAll = function<Item, Result> (
     array: Array<Item>,
-    fn: (item: Item, fnCallback: (error: Error | null, result: Result) => void) => void,
-    callback: (error: Error | null, results: Array<Result>) => void
+    fn: (item: Item, fnCallback: Callback<Result>) => void,
+    callback: Callback<Array<Result>>
 ) {
     if (!array.length) { return callback(null, []); }
     let remaining = array.length;
@@ -98,8 +98,11 @@ exports.asyncAll = function<Item, Result> (
     let error = null;
     array.forEach((item, i) => {
         fn(item, (err, result) => {
-            if (err) error = err;
-            results[i] = result;
+            if (err) {
+                error = err;
+            } else if (result) {
+                results[i] = result;
+            }
             if (--remaining === 0) callback(error, results);
         });
     });

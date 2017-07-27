@@ -68,13 +68,15 @@ function drawLineTile(program, painter, tile, buffers, layer, coord, layerData, 
             gl.uniform1f(program.u_sdfgamma, painter.lineAtlas.width / (Math.min(widthA, widthB) * 256 * browser.devicePixelRatio) / 2);
 
         } else if (image) {
-            imagePosA = painter.spriteAtlas.getPattern(image.from);
-            imagePosB = painter.spriteAtlas.getPattern(image.to);
+            imagePosA = painter.imageManager.getPattern(image.from);
+            imagePosB = painter.imageManager.getPattern(image.to);
             if (!imagePosA || !imagePosB) return;
 
             gl.uniform2f(program.u_pattern_size_a, imagePosA.displaySize[0] * image.fromScale / tileRatio, imagePosB.displaySize[1]);
             gl.uniform2f(program.u_pattern_size_b, imagePosB.displaySize[0] * image.toScale / tileRatio, imagePosB.displaySize[1]);
-            gl.uniform2fv(program.u_texsize, painter.spriteAtlas.getPixelSize());
+
+            const {width, height} = painter.imageManager.getPixelSize();
+            gl.uniform2fv(program.u_texsize, [width, height]);
         }
 
         gl.uniform2f(program.u_gl_units_to_pixels, 1 / painter.transform.pixelsToGLUnits[0], 1 / painter.transform.pixelsToGLUnits[1]);
@@ -94,7 +96,7 @@ function drawLineTile(program, painter, tile, buffers, layer, coord, layerData, 
         } else if (image) {
             gl.uniform1i(program.u_image, 0);
             gl.activeTexture(gl.TEXTURE0);
-            painter.spriteAtlas.bind(gl, true);
+            painter.imageManager.bind(gl);
 
             gl.uniform2fv(program.u_pattern_tl_a, (imagePosA : any).tl);
             gl.uniform2fv(program.u_pattern_br_a, (imagePosA : any).br);
