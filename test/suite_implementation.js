@@ -107,9 +107,9 @@ function applyOperations(map, operations, callback) {
         wait();
 
     } else if (operation[0] === 'addImage') {
-        const img = PNG.sync.read(fs.readFileSync(path.join(__dirname, './integration', operation[2])));
+        const {data, width, height} = PNG.sync.read(fs.readFileSync(path.join(__dirname, './integration', operation[2])));
         const pixelRatio = operation.length > 3 ? operation[3] : 1;
-        map.addImage(operation[1], img.data, {height: img.height, width: img.width, pixelRatio: pixelRatio});
+        map.addImage(operation[1], new window.ImageData(data, width, height), {pixelRatio});
         applyOperations(map, operations.slice(1), callback);
 
     } else {
@@ -160,10 +160,11 @@ sinon.stub(ajax, 'getImage').callsFake(({ url }, callback) => {
     if (cache[url]) return cached(cache[url], callback);
     return request({ url, encoding: null }, (error, response, body) => {
         if (!error && response.statusCode >= 200 && response.statusCode < 300) {
-            new PNG().parse(body, (err, png) => {
+            new PNG().parse(body, (err, {data, width, height}) => {
                 if (err) return callback(err);
-                cache[url] = png;
-                callback(null, png);
+                const image = new window.ImageData(data, width, height);
+                cache[url] = image;
+                callback(null, image);
             });
         } else {
             callback(error || new Error(response.statusCode));

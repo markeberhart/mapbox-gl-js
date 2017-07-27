@@ -1,6 +1,7 @@
 // @flow
 
 const window = require('./window');
+const {getImageData} = require('../util/browser');
 
 /**
  * The type of a resource.
@@ -112,7 +113,7 @@ function sameOrigin(url) {
 
 const transparentPngUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQYV2NgAAIAAAUAAarVyFEAAAAASUVORK5CYII=';
 
-exports.getImage = function(requestParameters: RequestParameters, callback: Callback<HTMLImageElement>) {
+exports.getImage = function(requestParameters: RequestParameters, callback: Callback<ImageData>) {
     // request the image with XHR to work around caching issues
     // see https://github.com/mapbox/mapbox-gl-js/issues/1470
     return exports.getArrayBuffer(requestParameters, (err, imgData) => {
@@ -122,7 +123,7 @@ exports.getImage = function(requestParameters: RequestParameters, callback: Call
             const img: HTMLImageElement = new window.Image();
             const URL = window.URL || window.webkitURL;
             img.onload = () => {
-                callback(null, img);
+                callback(null, getImageData(img));
                 URL.revokeObjectURL(img.src);
             };
             const blob: Blob = new window.Blob([new Uint8Array(imgData.data)], { type: 'image/png' });

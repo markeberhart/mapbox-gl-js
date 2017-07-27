@@ -55,7 +55,17 @@ function restore(): Window {
 
     window.restore = restore;
 
-    window.ImageData = window.ImageData || sinon.stub().returns(false);
+    window.ImageData = window.ImageData || function (...args) {
+        if (args.length === 3) {
+            this.data = args[0];
+            this.width = args[1];
+            this.height = args[2];
+        } else {
+            this.width = args[0];
+            this.height = args[1];
+            this.data = new Uint8ClampedArray(this.width * this.height * 4);
+        }
+    };
 
     util.extend(module.exports, window);
 

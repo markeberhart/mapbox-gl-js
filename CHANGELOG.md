@@ -1,3 +1,9 @@
+## master
+
+### :warning: Breaking changes
+
+- `Map#addImage` now accepts `ImageData` and no longer accepts a raw `ArrayBufferView` plus `width` and `height` options.
+
 ## 0.39.1 (July 24, 2017)
 
 ### :bug: Bug fixes

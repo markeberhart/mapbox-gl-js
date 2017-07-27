@@ -3,6 +3,7 @@
 const util = require('../util/util');
 const browser = require('../util/browser');
 const window = require('../util/window');
+const {HTMLImageElement, ImageData} = require('../util/window');
 const DOM = require('../util/dom');
 const ajax = require('../util/ajax');
 
@@ -1172,19 +1173,20 @@ class Map extends Camera {
      *
      * @see [Add an icon to the map](https://www.mapbox.com/mapbox-gl-js/example/add-image/)
      * @see [Add a generated icon to the map](https://www.mapbox.com/mapbox-gl-js/example/add-image-generated/)
-     * @param {string} name The name of the image.
-     * @param {HTMLImageElement|ArrayBufferView} image The image as an `HTMLImageElement` or `ArrayBufferView` (using the format of [`ImageData#data`](https://developer.mozilla.org/en-US/docs/Web/API/ImageData/data))
-     * @param {Object} [options] Required if and only if passing an `ArrayBufferView`
-     * @param {number} [options.width] The pixel width of the `ArrayBufferView` image
-     * @param {number} [options.height] The pixel height of the `ArrayBufferView` image
-     * @param {number} [options.pixelRatio] The ratio of pixels in the `ArrayBufferView` image to physical pixels on the screen
+     * @param id The ID of the image.
+     * @param data The image as an `HTMLImageElement` or `ImageData`
+     * @param options
+     * @param options.pixelRatio The ratio of pixels in the image to physical pixels on the screen
      */
-    addImage(
-        name: string,
-        image: HTMLImageElement | $ArrayBufferView,
-        options?: {width: number, height: number, pixelRatio: number}
-    ) {
-        this.style.spriteAtlas.addImage(name, image, (options : any));
+    addImage(name: string, data: HTMLImageElement | ImageData,
+             {pixelRatio = 1, sdf = false}: {pixelRatio?: number, sdf?: boolean} = {}) {
+        if (data instanceof HTMLImageElement) {
+            data = browser.getImageData(data);
+        }
+        if (!(data instanceof ImageData)) {
+            return this.fire('error', {error: new Error('Image provided in an invalid format. Supported formats are HTMLImageElement and ImageData.')});
+        }
+        this.style.spriteAtlas.addImage(name, data, {pixelRatio, sdf});
     }
 
     /**
@@ -1200,11 +1202,11 @@ class Map extends Camera {
      * Load an image from an external URL for use with `Map#addImage`. External
      * domains must support [CORS](https://developer.mozilla.org/en-US/docs/Web/HTTP/Access_control_CORS).
      *
-     * @param {string} url The URL of the image file. Image file must be in png, webp, or jpg format.
-     * @param {Function} callback Expecting `callback(error, data)`. Called when the image has loaded or with an error argument if there is an error.
+     * @param url The URL of the image file. Image file must be in png, webp, or jpg format.
+     * @param callback Expecting `callback(error, data)`. Called when the image has loaded or with an error argument if there is an error.
      * @see [Add an icon to the map](https://www.mapbox.com/mapbox-gl-js/example/add-image/)
      */
-    loadImage(url: string, callback: Function) {
+    loadImage(url: string, callback: Callback<ImageData>) {
         ajax.getImage(this._transformRequest(url, ajax.ResourceType.Image), callback);
     }
 

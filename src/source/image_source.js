@@ -63,7 +63,7 @@ class ImageSource extends Evented implements Source {
     map: Map;
     texture: WebGLTexture;
     textureLoaded: boolean;
-    image: HTMLImageElement;
+    image: ImageData;
     centerCoord: Coordinate;
     coord: TileCoord;
     _tileCoords: Array<Point>;
@@ -182,7 +182,7 @@ class ImageSource extends Evented implements Source {
         this._prepareImage(this.map.painter.gl, this.image);
     }
 
-    _prepareImage(gl: WebGLRenderingContext, image: HTMLImageElement | HTMLVideoElement | HTMLCanvasElement, resize?: boolean) {
+    _prepareImage(gl: WebGLRenderingContext, image: TexImageSource, resize?: boolean) {
         if (!this.textureLoaded) {
             this.textureLoaded = true;
             this.texture = gl.createTexture();
@@ -194,7 +194,7 @@ class ImageSource extends Evented implements Source {
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
         } else if (resize) {
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
-        } else if (image instanceof window.HTMLVideoElement || image instanceof window.ImageData || image instanceof window.HTMLCanvasElement) {
+        } else if (image instanceof window.HTMLVideoElement || image instanceof window.HTMLCanvasElement) {
             gl.bindTexture(gl.TEXTURE_2D, this.texture);
             gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, image);
         }
