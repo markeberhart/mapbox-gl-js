@@ -13,6 +13,7 @@ const RasterBoundsArray = require('../data/raster_bounds_array');
 const PosArray = require('../data/pos_array');
 const ProgramConfiguration = require('../data/program_configuration');
 const shaders = require('../shaders');
+const RenderTexture = require('./render_texture');
 const assert = require('assert');
 
 const draw = {
@@ -21,6 +22,7 @@ const draw = {
     line: require('./draw_line'),
     fill: require('./draw_fill'),
     'fill-extrusion': require('./draw_fill_extrusion'),
+    'fill-extrusion-texture': require('./draw_fill_extrusion_texture'),
     raster: require('./draw_raster'),
     background: require('./draw_background'),
     debug: require('./draw_debug')
@@ -61,7 +63,8 @@ class Painter {
     emptyProgramConfiguration: ProgramConfiguration;
     width: number;
     height: number;
-    viewportTexture: WebGLTexture;
+    viewportTextures: Array<WebGLTexture>;
+    _prerenderedTextures: { [string]: WebGLTexture };
     viewportFbo: WebGLFramebuffer;
     _depthMask: boolean;
     tileExtentBuffer: Buffer;
@@ -91,6 +94,8 @@ class Painter {
         this.gl = gl;
         this.transform = transform;
         this._tileTextures = {};
+        this._prerenderedTextures = {};
+        this.viewportTextures = [];
 
         this.frameHistory = new FrameHistory();
 
@@ -118,9 +123,11 @@ class Painter {
         this.height = height * browser.devicePixelRatio;
         gl.viewport(0, 0, this.width, this.height);
 
-        if (this.viewportTexture) {
-            this.gl.deleteTexture(this.viewportTexture);
-            this.viewportTexture = null;
+        if (this.viewportTextures.length) {
+            for (let i = 0; i < this.viewportTextures.length; i++) {
+                this.gl.deleteTexture(this.viewportTextures[i]);
+            }
+            this.viewportTextures = [];
         }
         if (this.viewportFbo) {
             this.gl.deleteFramebuffer(this.viewportFbo);
@@ -261,6 +268,9 @@ class Painter {
 
         this.frameHistory.record(Date.now(), this.transform.zoom, style.getTransition().duration);
 
+        this.isOpaquePass = false;
+        this.render3D();
+
         this.prepareBuffers();
         this.clearColor();
         this.clearDepth();
@@ -279,6 +289,92 @@ class Painter {
             if (sourceCache) {
                 draw.debug(this, sourceCache, sourceCache.getVisibleCoordinates());
             }
+        }
+    }
+
+    render3D() {
+        // If this style has 3D (fill-extrusion) layers, we render them first
+        // to offscreen textures so that we don't have to do an expensive
+        // framebuffer restore in the middle of the translucent renderPass.
+        if (!this.style._order3D.length) return;
+
+        const gl = this.gl;
+        // We'll wait and only attach the framebuffer if we think we're
+        // rendering something.
+        let fboAttached = false;
+
+        let sourceCache;
+        let coords = [];
+
+        for (let i = 0; i < this.style._order3D.length; i++) {
+            const layerId = this.style._order3D[i];
+            const layer = this.style._layers[layerId];
+
+            if (layer.paint['fill-extrusion-opacity'] === 0 || layer.isHidden(this.transform.zoom)) {
+                // Don't bother creating a texture if we're not going
+                // to render anything: emplace a null value as a marker
+                // for the regular translucent render pass.
+                this._prerenderedTextures[layerId] = null;
+            } else {
+                if (layer.source !== (sourceCache && sourceCache.id)) {
+                    sourceCache = this.style.sourceCaches[layer.source];
+                    coords = [];
+
+                    if (sourceCache) {
+                        if (sourceCache.prepare) sourceCache.prepare();
+                        this.clearStencil();
+                        coords = sourceCache.getVisibleCoordinates();
+                    }
+
+                    coords.reverse();
+                }
+
+                if (!coords.length) {
+                    this._prerenderedTextures[layerId] = null;
+                    continue;
+                }
+
+                if (!fboAttached) {
+                    this._setup3DFramebuffer();
+                    fboAttached = true;
+                }
+
+                let renderTarget = this.viewportTextures.pop();
+                if (!renderTarget) {
+                    renderTarget = new RenderTexture(this);
+                }
+                renderTarget.attachToFramebuffer();
+
+                this.renderLayer(this, (sourceCache : any), layer, coords);
+
+                renderTarget.detachFromFramebuffer();
+
+                this._prerenderedTextures[layerId] = renderTarget;
+            }
+
+            if (i === this.style._order3D.length - 1 && fboAttached) {
+                this.clearDepth();
+            }
+        }
+
+        if (fboAttached) gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    }
+
+    _setup3DFramebuffer() {
+        const gl = this.gl;
+        // All of the 3D textures will use the same framebuffer and depth renderbuffer.
+        let fbo = this.viewportFbo;
+        if (!fbo) {
+            fbo = gl.createFramebuffer();
+            gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+            this.depthRbo = gl.createRenderbuffer();
+            gl.bindRenderbuffer(gl.RENDERBUFFER, this.depthRbo);
+            gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, this.width, this.height);
+            gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+            gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, this.depthRbo);
+            this.viewportFbo = fbo;
+        } else {
+            gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
         }
     }
 
@@ -319,7 +415,17 @@ class Painter {
                 }
             }
 
-            this.renderLayer(this, (sourceCache : any), layer, coords);
+            if (!this.isOpaquePass && layer.type === 'fill-extrusion') {
+                const renderTarget = this._prerenderedTextures[layer.id];
+                if (renderTarget) {
+                    this.id = layer.id;
+                    draw['fill-extrusion-texture'](this, layer, renderTarget.texture);
+                    this.viewportTextures.push(renderTarget);
+                    delete this._prerenderedTextures[layer.id];
+                }
+            } else {
+                this.renderLayer(this, (sourceCache : any), layer, coords);
+            }
             this.currentLayer += this.isOpaquePass ? -1 : 1;
         }
     }

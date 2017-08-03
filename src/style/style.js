@@ -80,6 +80,7 @@ class Style extends Evented {
 
     _layers: {[string]: StyleLayer};
     _order: Array<string>;
+    _order3D: Array<string>;
     sourceCaches: {[string]: SourceCache};
     zoomHistory: ZoomHistory | {};
     _loaded: boolean;
@@ -231,6 +232,7 @@ class Style extends Evented {
         const layers = deref(this.stylesheet.layers);
 
         this._order = layers.map((layer) => layer.id);
+        this._order3D = layers.filter((layer) => layer.type === 'fill-extrusion').map((layer) => layer.id);
 
         this._layers = {};
         for (let layer of layers) {
