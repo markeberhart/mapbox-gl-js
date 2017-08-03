@@ -1,6 +1,12 @@
+// @flow
+
+import type Painter from './painter';
 
 class RenderTexture {
-	constructor(painter) {
+	gl: WebGLRenderingContext;
+	texture: WebGLTexture;
+
+	constructor(painter: Painter) {
 		const gl = this.gl = painter.gl;
 
         const texture = this.texture = gl.createTexture();

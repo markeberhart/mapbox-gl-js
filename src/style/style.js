@@ -246,7 +246,7 @@ class Style extends Evented {
         this.light = new Light(this.stylesheet.light);
     }
 
-    _serializeLayers(ids) {
+    _serializeLayers(ids: Array<string>) {
         return ids.map((id) => this._layers[id].serialize());
     }
 

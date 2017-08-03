@@ -1,12 +1,18 @@
+// @flow
 
 const Buffer = require('../data/buffer');
 const VertexArrayObject = require('./vertex_array_object');
 const PosArray = require('../data/pos_array');
 const mat4 = require('@mapbox/gl-matrix').mat4;
 
+import type Painter from './painter';
+import type SourceCache from '../source/source_cache';
+import type StyleLayer from '../style/style_layer';
+import type TileCoord from '../source/tile_coord';
+
 module.exports = draw;
 
-function draw(painter, layer, texture) {
+function draw(painter: Painter, layer: StyleLayer, texture: WebGLTexture) {
 	const gl = painter.gl;
     const program = painter.useProgram('extrusionTexture');
 

@@ -63,9 +63,10 @@ class Painter {
     emptyProgramConfiguration: ProgramConfiguration;
     width: number;
     height: number;
-    viewportTextures: Array<WebGLTexture>;
-    _prerenderedTextures: { [string]: WebGLTexture };
+    viewportTextures: Array<RenderTexture>;
+    _prerenderedTextures: { [string]: ?RenderTexture };
     viewportFbo: WebGLFramebuffer;
+    depthRbo: WebGLRenderbuffer;
     _depthMask: boolean;
     tileExtentBuffer: Buffer;
     tileExtentVAO: VertexArrayObject;
