@@ -15,7 +15,10 @@ const path = require('path');
 rtlTextPlugin['applyArabicShaping'] = rtlText.applyArabicShaping;
 rtlTextPlugin['processBidirectionalText'] = rtlText.processBidirectionalText;
 
+let map;
+
 module.exports = function(style, options, _callback) {
+
     let wasCallbackCalled = false;
     function callback() {
         if (!wasCallbackCalled) {
@@ -30,20 +33,26 @@ module.exports = function(style, options, _callback) {
     Object.defineProperty(container, 'offsetWidth', {value: options.width});
     Object.defineProperty(container, 'offsetHeight', {value: options.height});
 
-    const map = new Map({
-        container: container,
-        style: style,
-        classes: options.classes,
-        interactive: false,
-        attributionControl: false,
-        preserveDrawingBuffer: true
-    });
+    if (typeof map === 'undefined' || !options.recycleMap) {
+        map = new Map({
+            container: container,
+            style: style,
+            classes: options.classes,
+            interactive: false,
+            attributionControl: false,
+            preserveDrawingBuffer: true
+        });
 
-    // Configure the map to never stop the render loop
-    map.repaint = true;
+        // Configure the map to never stop the render loop
+        map.repaint = true;
+    } else if (options.recycleMap) {
+        map.resize();
+        map.setStyle(style, {diff: false});
+        map.setClasses(options.classes || {});
+    }
 
-    if (options.debug) map.showTileBoundaries = true;
-    if (options.showOverdrawInspector) map.showOverdrawInspector = true;
+    map.showTileBoundaries = options.debug;
+    map.showOverdrawInspector = options.showOverdrawInspector;
 
     const gl = map.painter.gl;
 
@@ -77,9 +86,11 @@ module.exports = function(style, options, _callback) {
                 map.queryRenderedFeatures(options.queryGeometry, options.queryOptions || {}) :
                 [];
 
-            map.remove();
-            gl.getExtension('STACKGL_destroy_context').destroy();
-            delete map.painter.gl;
+            if (!options.recycleMap) {
+                map.remove();
+                gl.getExtension('STACKGL_destroy_context').destroy();
+                delete map.painter.gl;
+            }
 
             callback(null, data, results.map((feature) => {
                 feature = feature.toJSON();
