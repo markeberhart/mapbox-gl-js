@@ -1,12 +1,8 @@
 // @flow
 
 const glMatrix = require('@mapbox/gl-matrix');
-const Buffer = require('../data/buffer');
-const VertexArrayObject = require('./vertex_array_object');
-const PosArray = require('../data/pos_array');
 const pattern = require('./pattern');
 const mat3 = glMatrix.mat3;
-const mat4 = glMatrix.mat4;
 const vec3 = glMatrix.vec3;
 
 import type Painter from './painter';

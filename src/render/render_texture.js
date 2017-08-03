@@ -3,11 +3,11 @@
 import type Painter from './painter';
 
 class RenderTexture {
-	gl: WebGLRenderingContext;
-	texture: WebGLTexture;
+    gl: WebGLRenderingContext;
+    texture: WebGLTexture;
 
-	constructor(painter: Painter) {
-		const gl = this.gl = painter.gl;
+    constructor(painter: Painter) {
+        const gl = this.gl = painter.gl;
 
         const texture = this.texture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -18,17 +18,17 @@ class RenderTexture {
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, painter.width, painter.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
 
         gl.bindTexture(gl.TEXTURE_2D, null);
-	}
+    }
 
-	attachToFramebuffer() {
-		const gl = this.gl;
-		gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.texture, 0);
-	}
+    attachToFramebuffer() {
+        const gl = this.gl;
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.texture, 0);
+    }
 
-	detachFromFramebuffer() {
-		const gl = this.gl;
-		gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, null, 0);
-	}
+    detachFromFramebuffer() {
+        const gl = this.gl;
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, null, 0);
+    }
 }
 
 module.exports = RenderTexture;
