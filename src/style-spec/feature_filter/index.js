@@ -34,6 +34,8 @@ function compile(filter) {
         op === '!in' ? compileNegation(compileInOp(filter[1], filter.slice(2))) :
         op === 'has' ? compileHasOp(filter[1]) :
         op === '!has' ? compileNegation(compileHasOp(filter[1])) :
+        op === 'like' ? compileLikeOp(filter[1], filter[2]) :
+        op === '!like' ? compileNotLikeOp(filter[1], filter[2]) :
         'true';
     return `(${str})`;
 }
@@ -77,6 +79,13 @@ function compileHasOp(property) {
 
 function compileNegation(expression) {
     return `!(${expression})`;
+}
+
+function compileLikeOp(property, value){
+    return `((String(p[${JSON.stringify(property)}]).indexOf(String(${JSON.stringify(value)})))!==-1)`;
+}
+function compileNotLikeOp(property, value){
+    return `((String(p[${JSON.stringify(property)}]).indexOf(String(${JSON.stringify(value)})))==-1)`;
 }
 
 // Comparison function to sort numbers and strings
